@@ -1,29 +1,231 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ml5/0.6.0/ml5.min.js"></script>
-    <script src="script.js"></script>
-    <style>
-      body {
-        text-align: center;
-        font-family: Arial, sans-serif;
-      }
-      canvas {
-        display: block;
-        margin: auto;
-      }
-      #status {
-        font-size: 24px;
-        margin-top: 10px;
-      }
-    </style>
+    <title>Teachable Machine Image Model</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+    <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
   </head>
-  <body>
-    <h1>Morpion</h1>
-    <div id="status">Tour de : X</div>
+  <body class="body">
+    <header>
+      <div id="webcam-container"></div>
+      <div id="label-container"></div>
+      <script>
+        const MODEL_URL = "./model/";
+
+        let model, webcam, labelContainer, maxPredictions;
+        let currentPlayer = "X";
+        let board = [
+          ["", "", ""],
+          ["", "", ""],
+          ["", "", ""],
+        ];
+        let currentLabel = "";
+        let hoverTimeout;
+
+        async function init() {
+          await tf.ready();
+
+          const modelURL = MODEL_URL + "model.json";
+          const metadataURL = MODEL_URL + "metadata.json";
+
+          model = await tmImage.load(modelURL, metadataURL);
+          maxPredictions = model.getTotalClasses();
+
+          const flip = true;
+          webcam = new tmImage.Webcam(400, 400, flip);
+          await webcam.setup();
+          await webcam.play();
+          window.requestAnimationFrame(loop);
+
+          document
+            .getElementById("webcam-container")
+            .appendChild(webcam.canvas);
+          labelContainer = document.getElementById("label-container");
+          for (let i = 0; i < maxPredictions; i++) {
+            labelContainer.appendChild(document.createElement("div"));
+          }
+
+          setInterval(predict, 100);
+        }
+
+        async function predict() {
+          const prediction = await model.predict(webcam.canvas);
+          prediction.sort((a, b) => b.probability - a.probability);
+          currentLabel = prediction[0].className;
+
+          for (let i = 0; i < maxPredictions; i++) {
+            const classPrediction =
+              prediction[i].className +
+              ": " +
+              prediction[i].probability.toFixed(2);
+            labelContainer.childNodes[i].innerHTML = classPrediction;
+          }
+        }
+
+        function updateBoard(label, x, y) {
+          const canvas = document.getElementById("board");
+          const rect = canvas.getBoundingClientRect();
+          const i = Math.floor(x / (canvas.width / 3));
+          const j = Math.floor(y / (canvas.height / 3));
+
+          if (board[i][j] == "") {
+            if (label === "Class 1") {
+              board[i][j] = "O";
+              currentPlayer = "X";
+            } else if (label === "Class 2") {
+              board[i][j] = "X";
+              currentPlayer = "O";
+            }
+            drawBoard();
+            checkWin();
+          }
+        }
+
+        function drawBoard() {
+          const canvas = document.getElementById("board");
+          const ctx = canvas.getContext("2d");
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          ctx.strokeStyle = "#000";
+          ctx.lineWidth = 4;
+
+          for (let i = 1; i < 3; i++) {
+            ctx.moveTo((canvas.width / 3) * i, 0);
+            ctx.lineTo((canvas.width / 3) * i, canvas.height);
+            ctx.moveTo(0, (canvas.height / 3) * i);
+            ctx.lineTo(canvas.width, (canvas.height / 3) * i);
+          }
+          ctx.stroke();
+
+          for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 3; j++) {
+              let x = (canvas.width / 3) * i + canvas.width / 6;
+              let y = (canvas.height / 3) * j + canvas.height / 6;
+              let spot = board[i][j];
+              ctx.font = "32px Arial";
+              if (spot == "X") {
+                ctx.beginPath();
+                ctx.moveTo(x - 20, y - 20);
+                ctx.lineTo(x + 20, y + 20);
+                ctx.moveTo(x + 20, y - 20);
+                ctx.lineTo(x - 20, y + 20);
+                ctx.stroke();
+              } else if (spot == "O") {
+                ctx.beginPath();
+                ctx.arc(x, y, 20, 0, 2 * Math.PI);
+                ctx.stroke();
+              }
+            }
+          }
+        }
+
+        function checkWin() {
+          const winningCombinations = [
+            [
+              [0, 0],
+              [0, 1],
+              [0, 2],
+            ],
+            [
+              [1, 0],
+              [1, 1],
+              [1, 2],
+            ],
+            [
+              [2, 0],
+              [2, 1],
+              [2, 2],
+            ],
+            [
+              [0, 0],
+              [1, 0],
+              [2, 0],
+            ],
+            [
+              [0, 1],
+              [1, 1],
+              [2, 1],
+            ],
+            [
+              [0, 2],
+              [1, 2],
+              [2, 2],
+            ],
+            [
+              [0, 0],
+              [1, 1],
+              [2, 2],
+            ],
+            [
+              [0, 2],
+              [1, 1],
+              [2, 0],
+            ],
+          ];
+
+          for (const combination of winningCombinations) {
+            const [a, b, c] = combination;
+            if (
+              board[a[0]][a[1]] &&
+              board[a[0]][a[1]] === board[b[0]][b[1]] &&
+              board[a[0]][a[1]] === board[c[0]][c[1]]
+            ) {
+              alert(`Player ${board[a[0]][a[1]]} wins!`);
+              resetBoard();
+              return;
+            }
+          }
+
+          if (board.flat().every((cell) => cell)) {
+            alert("It's a draw!");
+            resetBoard();
+          }
+        }
+
+        function resetBoard() {
+          board = [
+            ["", "", ""],
+            ["", "", ""],
+            ["", "", ""],
+          ];
+          drawBoard();
+        }
+
+        function loop() {
+          webcam.update();
+          window.requestAnimationFrame(loop);
+        }
+
+        window.addEventListener("mousemove", (event) => {
+          const canvas = document.getElementById("board");
+          const rect = canvas.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+
+          if (hoverTimeout) {
+            clearTimeout(hoverTimeout);
+          }
+
+          hoverTimeout = setTimeout(() => {
+            updateBoard(currentLabel, x, y);
+          }, 3000);
+        });
+
+        window.addEventListener("load", () => {
+          const canvas = document.createElement("canvas");
+          canvas.id = "board";
+          canvas.width = 400;
+          canvas.height = 400;
+          document.body.appendChild(canvas);
+          drawBoard();
+          init();
+        });
+      </script>
+    </header>
   </body>
 </html>
