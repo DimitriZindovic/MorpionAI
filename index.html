@@ -176,15 +176,19 @@
               board[a[0]][a[1]] === board[b[0]][b[1]] &&
               board[a[0]][a[1]] === board[c[0]][c[1]]
             ) {
-              alert(`Player ${board[a[0]][a[1]]} wins!`);
-              resetBoard();
+              setTimeout(() => {
+                alert(`Player ${board[a[0]][a[1]]} wins!`);
+                requestAnimationFrame(resetBoard);
+              }, 100);
               return;
             }
           }
 
           if (board.flat().every((cell) => cell)) {
-            alert("It's a draw!");
-            resetBoard();
+            setTimeout(() => {
+              alert("It's a draw!");
+              requestAnimationFrame(resetBoard);
+            }, 100);
           }
         }
 
@@ -195,6 +199,7 @@
             ["", "", ""],
           ];
           drawBoard();
+          location.reload();
         }
 
         function loop() {
