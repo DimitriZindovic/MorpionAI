@@ -14,6 +14,7 @@
     <header>
       <div id="webcam-container"></div>
       <div id="label-container"></div>
+      <button id="restart-button">Restart</button>
       <script>
         const MODEL_URL = "./model/";
 
@@ -225,6 +226,10 @@
           drawBoard();
           init();
         });
+
+        document
+          .getElementById("restart-button")
+          .addEventListener("click", resetBoard);
       </script>
     </header>
   </body>
